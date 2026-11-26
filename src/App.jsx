@@ -274,6 +274,40 @@ export default function WorkoutApp() {
   // checkedSets[dayId][section][exIndex] = number of completed sets
   const [checkedSets, setCheckedSets] = usePersistentState("h2_checkedSets", {});
 
+  // Save / Load / Reset
+  const [modal, setModal] = useState(null); // null | "save" | "load"
+  const [exportText, setExportText] = useState("");
+  const [pasteText, setPasteText] = useState("");
+  const [toast, setToast] = useState("");
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2400); }
+  function handleSave() {
+    setExportText(JSON.stringify({ v: 1, checkedSets, selectedWeek, selectedDay }));
+    setModal("save");
+  }
+  function handleCopy() {
+    navigator.clipboard.writeText(exportText).then(() => {
+      showToast("Copied! Paste it into Notes or WhatsApp.");
+      setModal(null);
+    }).catch(() => showToast("Select all text above and copy manually"));
+  }
+  function handleLoad() {
+    try {
+      const data = JSON.parse(pasteText.trim());
+      if (data.v !== 1 || typeof data.checkedSets !== "object" || data.checkedSets === null) throw new Error();
+      setCheckedSets(data.checkedSets);
+      if (Number.isInteger(data.selectedWeek) && weeks[data.selectedWeek]) setSelectedWeek(data.selectedWeek);
+      if (Number.isInteger(data.selectedDay) && data.selectedDay >= 0 && data.selectedDay < 7) setSelectedDay(data.selectedDay);
+      setPasteText(""); setModal(null);
+      showToast("Progress loaded! ✅");
+    } catch (_) { showToast("Invalid data — paste the full copied text"); }
+  }
+  function handleReset() {
+    if (window.confirm("Reset ALL progress? This cannot be undone (use Save first to keep a backup).")) {
+      setCheckedSets({});
+      showToast("Progress reset");
+    }
+  }
+
   const currentWeek = weeks[selectedWeek];
 
   const isDeload = currentWeek.type === "deload";
@@ -346,10 +380,44 @@ export default function WorkoutApp() {
   return (
     <div style={{ minHeight: "100vh", background: "#0D0D0D", fontFamily: "'Georgia', serif", color: "#F0EDE8", paddingBottom: 80 }}>
 
+      {toast && (
+        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: "#1a1a1a", border: "1px solid #3a5c30", color: "#7ec8a0", padding: "8px 18px", borderRadius: 8, fontSize: 12, zIndex: 300, maxWidth: "90vw", textAlign: "center" }}>{toast}</div>
+      )}
+
+      {modal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#111", borderRadius: 14, border: "1px solid #2a2a2a", padding: 20, width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{modal === "save" ? "💾 Save Your Progress" : "📂 Load Your Progress"}</div>
+            <div style={{ fontSize: 11, color: "#999" }}>
+              {modal === "save" ? "Copy this text and keep it in Notes, WhatsApp, or any text app." : "Paste the text you saved earlier."}
+            </div>
+            <textarea
+              readOnly={modal === "save"}
+              value={modal === "save" ? exportText : pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              onFocus={(e) => modal === "save" && e.target.select()}
+              placeholder={modal === "load" ? "Paste saved progress here…" : ""}
+              style={{ width: "100%", height: 130, background: "#0D0D0D", color: "#F0EDE8", border: "1px solid #2a2a2a", borderRadius: 8, padding: 10, fontSize: 11, fontFamily: "monospace", resize: "none" }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setModal(null)} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #333", background: "transparent", color: "#aaa", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+              <button onClick={modal === "save" ? handleCopy : handleLoad} style={{ flex: 2, padding: 10, borderRadius: 8, border: "none", background: "#C8B89A", color: "#111", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                {modal === "save" ? "Copy to Clipboard" : "Load"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ background: "#111", borderBottom: "1px solid #1e1e1e", padding: "24px 18px 14px", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ fontSize: 10, letterSpacing: "0.25em", color: "#666", marginBottom: 3, textTransform: "uppercase" }}>6-Day Push · Pull · Legs + Abs</div>
         <div style={{ fontSize: 23, fontWeight: "bold", letterSpacing: "-0.02em" }}>Muscle Building Program</div>
+        <div style={{ display: "flex", gap: 7, marginTop: 11 }}>
+          {[["💾 Save", handleSave, "#C8B89A"], ["📂 Load", () => { setPasteText(""); setModal("load"); }, "#C8B89A"], ["🔄 Reset", handleReset, "#ff6b6b"]].map(([label, fn, col]) => (
+            <button key={label} onClick={fn} style={{ flex: 1, padding: "7px 0", borderRadius: 7, border: `1px solid ${col}55`, background: "#0D0D0D", color: col, fontSize: 12, cursor: "pointer", fontFamily: "'Georgia', serif" }}>{label}</button>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: 7, marginTop: 13, overflowX: "auto", paddingBottom: 2 }}>
           {weeks.map((w, i) => {
             const accent = w.type === "deload" ? "#A8E6CF" : w.type === "overload" ? "#FFB347" : "#C8B89A";
