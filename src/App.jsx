@@ -1,4 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// useState that persists to localStorage
+function usePersistentState(key, initial) {
+  const [value, setValue] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw === null ? initial : JSON.parse(raw);
+    } catch (_) { return initial; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {}
+  }, [key, value]);
+  return [value, setValue];
+}
 
 const weeks = [
   { label: "Week 1", type: "normal", intensity: "Normal Load" },
@@ -253,12 +267,12 @@ function SetTracker({ totalSets, completedSets, color, onToggle }) {
 }
 
 export default function WorkoutApp() {
-  const [selectedWeek, setSelectedWeek] = useState(0);
-  const [selectedDay, setSelectedDay] = useState(0);
+  const [selectedWeek, setSelectedWeek] = usePersistentState("h2_week", 0);
+  const [selectedDay, setSelectedDay] = usePersistentState("h2_day", 0);
   const [expandedExercise, setExpandedExercise] = useState(null);
-  const [activeSection, setActiveSection] = useState("main");
+  const [activeSection, setActiveSection] = usePersistentState("h2_section", "main");
   // checkedSets[dayId][section][exIndex] = number of completed sets
-  const [checkedSets, setCheckedSets] = useState({});
+  const [checkedSets, setCheckedSets] = usePersistentState("h2_checkedSets", {});
 
   const currentWeek = weeks[selectedWeek];
 
